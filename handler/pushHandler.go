@@ -74,18 +74,33 @@ func gitPull(cloneURL string){
 	name = name[0:len(name)-4]
 	fmt.Println(name)
 	pwd, _ := os.Getwd()
-	gitPath := path.Join(pwd, "gits")
-	err := CheckDirOrCreate(gitPath)
+	gitsPath := path.Join(pwd, "gits")
+	err := CheckDirOrCreate(gitsPath)
 	if err!=nil{
 		panic(err)
 	}
-	os.Chdir(gitPath)
-	resp := excuteShellCommand("git clone " + cloneURL)
-	ifErr := strings.Index(resp, "error")
-	if ifErr != -1{
-		fmt.Println("发送错误")
+	gitPrjPath := path.Join(gitsPath, name)
+	ifExistGit, _ := PathExists(gitPrjPath)
+	if !ifExistGit{
+		//如果本地不存在仓库
+		resp := excuteShellCommand("git clone " + cloneURL)
+		os.Chdir(gitPrjPath)
+		ifErr := strings.Index(resp, "error")
+		if ifErr != -1{
+			fmt.Println("发送错误")
+		}
+		fmt.Println(resp)
+	}else {
+		//如果本地已经存在仓库
+		os.Chdir(gitPrjPath)
+		resp := excuteShellCommand("git pull ")
+		ifErr := strings.Index(resp, "error")
+		if ifErr != -1{
+			fmt.Println("发送错误")
+		}
+		fmt.Println(resp)
 	}
-	fmt.Println(resp)
+
 }
 
 func getCommands()[]string{
