@@ -72,9 +72,10 @@ func gitPull(cloneURL string){
 	s :=strings.Split(cloneURL, "/")
 	name := s[len(s)-1]
 	name = name[0:len(name)-4]
-	fmt.Println(name)
 	pwd, _ := os.Getwd()
 	gitsPath := path.Join(pwd, "gits")
+	log.Log(gitsPath)
+	os.Chdir(gitsPath)
 	err := CheckDirOrCreate(gitsPath)
 	if err!=nil{
 		panic(err)
@@ -84,6 +85,7 @@ func gitPull(cloneURL string){
 	if !ifExistGit{
 		//如果本地不存在仓库
 		resp := excuteShellCommand("git clone " + cloneURL)
+		log.Log(gitPrjPath)
 		os.Chdir(gitPrjPath)
 		ifErr := strings.Index(resp, "error")
 		if ifErr != -1{
@@ -93,6 +95,7 @@ func gitPull(cloneURL string){
 	}else {
 		//如果本地已经存在仓库
 		os.Chdir(gitPrjPath)
+		log.Log(gitPrjPath)
 		resp := excuteShellCommand("git pull ")
 		ifErr := strings.Index(resp, "error")
 		if ifErr != -1{
@@ -160,7 +163,6 @@ func GetStrBody(r *http.Request) (string, error) {
 //返回请求r 的string, map[string]interface{} 两种类型的body
 func GetStrandMapBody(r *http.Request) (string, map[string]interface{}, error){
 	//将参数解析为 map[string]interface{}型
-	fmt.Println(r.Method)
 	var strb string
 	ContType  := r.Header["Content-Type"]
 	if ContType[0] == "application/json"{
