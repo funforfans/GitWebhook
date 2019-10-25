@@ -3,6 +3,7 @@ package handler
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/micro/go-micro/util/log"
@@ -11,14 +12,42 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"encoding/json"
-	"strings"
 	"path"
+	"path/filepath"
+	"strings"
+)
+var(
+	secret = "abcdefghi"  //gogs中的secret
+	rawPWD = ""
+	gitBaseDir= "gits" // 总目录名称
+	gitPullDir = "proto"
+	gitMiddleDir = "template"
+	gitPushDir = "target"
+	fullPathDir = []string{}
 )
 
-var secret = "abcdefghi"  //gogs中的secret
-var rawPWD = ""
-
+func init()  {
+	rawPWD,_ = os.Getwd()
+	log.Log("init...", rawPWD)
+	gitBaseDir=path.Join(rawPWD, gitBaseDir)
+	dirList := []string{gitPullDir, gitMiddleDir, gitPushDir}
+	for i, dir:=range dirList{
+		if dir != ""{
+			dirList[i] = path.Join(gitBaseDir, dir)
+		}
+	}
+	fullPathDir = dirList
+	checkSourceDir(fullPathDir...)
+}
+func checkSourceDir(fullPathDir ...string)  {
+	for _, dir:=range fullPathDir{
+		if dir != ""{
+			if err:=CheckDirOrCreate(dir);err!=nil{
+				panic(err)
+			}
+		}
+	}
+}
 
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -32,6 +61,7 @@ func PathExists(path string) (bool, error) {
 }
 
 func GetPush(w http.ResponseWriter, r *http.Request) {
+	log.Log("init...", GetPush)
 	hs256 :=r.Header.Get("X-Gogs-Signature")
 	strBody,body, err := GetStrandMapBody(r)
 	if err != nil{
@@ -43,10 +73,6 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("sha256 hmac不一致！")
 		return
 	}
-	curPath, _ := os.Getwd()
-	if rawPWD=="" {
-		rawPWD = curPath
-	}
 	//一定要加上，将工作目录切换回去
 	defer func(){
 		os.Chdir(rawPWD)
@@ -55,32 +81,33 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	if err != nil{
 		panic(err)
 	}
-	fmt.Println(curPath, cloneURL)
+	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
-	gitPull(cloneURL.(string))
+	gitPull(cloneURL.(string), gitPullDir)
+	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
+	gitPull(pushUrl, gitPushDir)
+}
 
-	//dirPath :=path.Join(curPath, "target")
-	//if exist, err :=PathExists(dirPath);err!=nil && exist{
-	//	os.RemoveAll("target/proto_go")
-	//}
-	//os.MkdirAll("target/proto_go", 0777)
-	//
+func cmdProtoc(targetPath string)  {
+	var commands = make([]string, 2)
+	commands = append(commands, "protoc")
+	commands = append(commands, "protoc")
 }
 
 //通过cloneURL找到本地对应的仓库，并在没有此路径时git clone cloneURL， 如果冲突则删除再clone，否则直接pull
-func gitPull(cloneURL string){
-	s :=strings.Split(cloneURL, "/")
-	name := s[len(s)-1]
-	name = name[0:len(name)-4]
+func gitPull(cloneURL,gitPullDir  string){
+	projectName :=strings.Split(path.Base(cloneURL), ".git")[0]
 	pwd, _ := os.Getwd()
-	gitsPath := path.Join(pwd, "gits")
+	gitsPath := path.Join(pwd, gitPullDir)
 	log.Log(gitsPath)
-	os.Chdir(gitsPath)
 	err := CheckDirOrCreate(gitsPath)
 	if err!=nil{
 		panic(err)
 	}
-	gitPrjPath := path.Join(gitsPath, name)
+	if err:=os.Chdir(gitsPath);err!=nil{
+		panic(err)
+	}
+	gitPrjPath := path.Join(gitsPath, projectName)
 	ifExistGit, _ := PathExists(gitPrjPath)
 	if !ifExistGit{
 		//如果本地不存在仓库
@@ -106,6 +133,10 @@ func gitPull(cloneURL string){
 
 }
 
+func gitPusher(cloneURL,gitPullDir  string){
+	
+}
+
 func getCommands()[]string{
 	var commands = make([]string, 2)
 	commands = append(commands, "-c")
@@ -116,7 +147,7 @@ func getCommands()[]string{
 
 func excuteShellCommands(commands []string)[]string{
 	var resps = make([]string, 1)
-	for _, i := range(commands){
+	for _, i := range commands{
 		if i != ""{
 			resp := excuteShellCommand(i)
 			resps = append(resps, resp)
@@ -216,4 +247,21 @@ func CheckDirOrCreate(dirPath string) error{
 		}
 	}
 	return nil
+}
+
+func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
+	checkSourceDir(fullPathDir...)
+
+	if path.Ext(curPath) == ".proto"{
+		log.Log(fullPathDir)
+		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathDir[0], fullPathDir[1], fullPathDir[1], curPath)
+		excuteShellCommand(cmd)
+	}
+	return err
+}
+
+func GetFilelist(path string) {
+	if err := filepath.Walk(path, protoc);err!=nil{
+
+	}
 }
