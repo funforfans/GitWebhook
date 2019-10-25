@@ -84,7 +84,7 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string), gitPullDir)
-	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
+	pushUrl :="http://git.touch4.me/xuyiwen/target.git"
 	gitPull(pushUrl, gitPushDir)
 }
 
