@@ -86,7 +86,9 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string), gitPullDir)
-	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
+<<<<<<< .merge_file_UZn1fL
+	curPath,_ :=os.Getwd()
+	gitBaseDir:=path.Join(curPath, "gits")
 	GetFilelist(gitBaseDir)
 	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
 	gitPull(pushUrl, gitPushDir)
@@ -96,6 +98,14 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+=======
+	//进入需要clone或者pull的目录
+	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
+	gitBaseDir:=path.Join(rawPWD, "gits", projectName)
+	GetFilelist(gitBaseDir)
+	pushUrl :="http://git.touch4.me/xuyiwen/target.git"
+	gitPull(pushUrl, gitPushDir)
+>>>>>>> .merge_file_bPDQeh
 	gitPusher(pushUrl, gitPushDir)
 }
 
@@ -155,6 +165,9 @@ func gitPull(cloneURL,gitPullDir  string){
 
 }
 
+<<<<<<< .merge_file_UZn1fL
+func gitPusher(cloneURL,gitPullDir  string){
+=======
 func gitPusher(cloneURL,gitPushDir string){
 	pushProjectName := strings.Split(path.Base(cloneURL), ".git")[0]
 	pushPath := path.Join(rawPWD, gitBaseDir, pushProjectName)
@@ -173,6 +186,8 @@ func gitPusher(cloneURL,gitPushDir string){
 	resps := excuteShellCommands(commands)
 	log.Log("----> push resps: ", resps)
 
+}
+>>>>>>> .merge_file_bPDQeh
 
 }
 
