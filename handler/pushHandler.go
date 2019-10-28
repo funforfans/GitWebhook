@@ -77,12 +77,12 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	generateDir :=configer["targetUrl"].(string)
 	generateName :=strings.Split(path.Base(generateDir), ".git")[0]
 	gitPull(configer["targetUrl"].(string))
-	cmd := fmt.Sprintf("cp -R %s/ %s/",path.Join(gitAbsDir, gitMiddleDir, projectName), path.Join(gitAbsDir, generateName))
+	cmd := fmt.Sprintf("cp -R %s %s/",path.Join(gitAbsDir, gitMiddleDir, projectName), path.Join(gitAbsDir, generateName))
 	if _, err :=excuteShellCommand(cmd);err!=nil{
 		panic(err)
 		return
 	}
-	gitPusher(configer["targetUrl"].(string))
+	//gitPusher(configer["targetUrl"].(string))
 }
 
 func cmdProtoc(targetPath string)  {
