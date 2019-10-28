@@ -68,21 +68,22 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	gitPull(cloneURL.(string))
 	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
 	targetName :=projectName+"_auto_push"
-	pushUrl := path.Dir(cloneURL.(string))+"/"+targetName +".git"
-	log.Log(pushUrl)
-	if err:=ExecMethods(gitAbsDir);err!=nil{
+	if err:=CheckDirOrCreate(path.Join(gitAbsDir, gitMiddleDir, targetName));err!=nil{
+		log.Log(err)
 		return
 	}
+	if err:=ExecMethods(path.Join(gitAbsDir, projectName));err!=nil{
+		return
+	}
+	generateDir :=configer["targetUrl"].(string)
+	generateName :=strings.Split(path.Base(generateDir), ".git")[0]
 	gitPull(configer["targetUrl"].(string))
-	os.Chdir(gitAbsDir)
-	path.Join(rawPWD, gitMiddleDir)
-	cmd := fmt.Sprintf("cp -R %s/* %s/", path.Join(rawPWD, gitMiddleDir), targetName)
+	cmd := fmt.Sprintf("cp -R %s/ %s/",path.Join(gitAbsDir, gitMiddleDir, targetName), path.Join(gitAbsDir, generateName))
 	if _, err :=excuteShellCommand(cmd);err!=nil{
 		panic(err)
 		return
 	}
-
-	gitPusher(pushUrl)
+	gitPusher(configer["targetUrl"].(string))
 }
 
 func cmdProtoc(targetPath string)  {
@@ -147,12 +148,12 @@ func gitPusher(pushUrl string){
 			panic(err)
 		}
 	}()
-	//commands := []string{}
-	//commands = append(commands, "git add .")
-	//commands = append(commands, "git commit -m \"自动编译，提交\"")
-	//commands = append(commands, "git push")
-	//resps, _ := excuteShellCommands(commands)
-	//log.Log("----> push resps: ", resps)
+	commands := []string{}
+	commands = append(commands, "git add .")
+	commands = append(commands, "git commit -m \"自动编译，提交\"")
+	commands = append(commands, "git push")
+	resps, _ := excuteShellCommands(commands)
+	log.Log("----> push resps: ", resps)
 
 
 }
@@ -242,8 +243,10 @@ func CheckDirOrCreate(dirPath string) error{
 }
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
+	log.Log("ddfdfdf", curPath)
 	if path.Ext(curPath) == ".proto"{
-		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=. --go_out=. %s", path.Dir(curPath), curPath)
+		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s",
+			path.Dir(curPath), path.Join(gitAbsDir, gitMiddleDir), path.Join(gitAbsDir, gitMiddleDir), curPath)
 		if _, err:=excuteShellCommand(cmd);err!=nil{
 			log.Log(err)
 			return err
