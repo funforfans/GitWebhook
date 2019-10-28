@@ -1,0 +1,8 @@
+{
+  "secret" : "abcdefghi",
+  "rawPWD": "",
+  "gitBaseDir": "gits",
+  "gitPullDir" : "proto",
+  "gitMiddleDir" :"template",
+  "gitPushDir" : "target"
+}
