@@ -35,6 +35,7 @@ func init()  {
 		fullPathMap[dir] = path.Join(gitBaseDir, dir)
 		dirList[i] = fullPathMap[dir]
 	}
+	log.Log("init: map: ", fullPathMap)
 	fullPathDir := dirList
 	checkSourceDir(fullPathDir...)
 }
@@ -86,12 +87,19 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string), gitPullDir)
-	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
+	//projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
 	GetFilelist(gitBaseDir)
 	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
 	gitPull(pushUrl, gitPushDir)
+	gitsPath := path.Join(rawPWD, "gits")
+	os.Chdir(gitsPath)
+	log.Log("gitsPath", gitsPath)
 	cmd := fmt.Sprintf("cp -R %s %s", gitMiddleDir, gitPushDir)
 	if _, err :=excuteShellCommand(cmd);err!=nil{
+		pwd, _ := os.Getwd()
+		log.Log("pwd: ", pwd)
+		log.Log("pwd: ", gitMiddleDir)
+		log.Log("pwd: ", gitPushDir)
 		panic(err)
 		return
 	}
@@ -166,12 +174,12 @@ func gitPusher(cloneURL,gitPushDir string){
 			panic(err)
 		}
 	}()
-	commands := []string{}
-	commands = append(commands, "git add .")
-	commands = append(commands, "git commit -m \"自动编译，提交\"")
-	commands = append(commands, "git push")
-	resps := excuteShellCommands(commands)
-	log.Log("----> push resps: ", resps)
+	//commands := []string{}
+	//commands = append(commands, "git add .")
+	//commands = append(commands, "git commit -m \"自动编译，提交\"")
+	//commands = append(commands, "git push")
+	//resps, _ := excuteShellCommands(commands)
+	//log.Log("----> push resps: ", resps)
 
 
 }
@@ -285,11 +293,13 @@ func CheckDirOrCreate(dirPath string) error{
 }
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
-	checkSourceDir(fullPathDir...)
+	for _,v := range fullPathMap{
+		checkSourceDir(v)
+	}
 
 	if path.Ext(curPath) == ".proto"{
-		log.Log(fullPathDir)
-		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathDir[0], fullPathDir[1], fullPathDir[1], curPath)
+		log.Log(fullPathMap)
+		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathMap["proto"], fullPathMap["template"], fullPathMap["template"], curPath)
 		excuteShellCommand(cmd)
 	}
 	return err
