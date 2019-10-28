@@ -17,36 +17,15 @@ import (
 	"strings"
 )
 var(
-	secret = "abcdefghi"  //gogs中的secret
-	rawPWD = ""
-	gitBaseDir= "gits" // 总目录名称
-	gitPullDir = "proto"
+	rawPWD, _ = os.Getwd()
+	gitAbsDir= path.Join(rawPWD, "gits") // 总目录名称
 	gitMiddleDir = "template"
-	gitPushDir = "target"
-	fullPathMap = make(map[string] string, 3)
+	configPath = "config/config.json"
 )
 
 func init()  {
-	rawPWD,_ = os.Getwd()
 	log.Log("init...", rawPWD)
-	gitBaseDir=path.Join(rawPWD, gitBaseDir)
-	dirList := []string{gitPullDir, gitMiddleDir, gitPushDir}
-	for i, dir:=range dirList{
-		fullPathMap[dir] = path.Join(gitBaseDir, dir)
-		dirList[i] = fullPathMap[dir]
-	}
-	log.Log("init: map: ", fullPathMap)
-	fullPathDir := dirList
-	checkSourceDir(fullPathDir...)
-}
-func checkSourceDir(fullPathDir ...string)  {
-	for _, dir:=range fullPathDir{
-		if dir != ""{
-			if err:=CheckDirOrCreate(dir);err!=nil{
-				panic(err)
-			}
-		}
-	}
+	ConfigWatcher(path.Join(rawPWD, configPath))
 }
 
 func PathExists(path string) (bool, error) {
@@ -67,7 +46,7 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	if err != nil{
 		panic(err)
 	}
-	myhs256 := ComputeHmacSha256(strBody, secret)
+	myhs256 := ComputeHmacSha256(strBody, configer["secret"].(string))
 	fmt.Println(myhs256, hs256)
 	if myhs256 != hs256{
 		fmt.Println("sha256 hmac不一致！")
@@ -86,26 +65,24 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	}
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
-	gitPull(cloneURL.(string), gitPullDir)
-	//projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
-	GetFilelist(gitBaseDir)
-	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
-	gitPull(pushUrl, gitPushDir)
-	os.Chdir(gitBaseDir)
-	log.Log("gitsPath", gitBaseDir)
-	cmds := []string{fmt.Sprintf("cp -R %s %s", fullPathMap[gitMiddleDir], fullPathMap[gitPushDir]),
-					 fmt.Sprintf("rm -f %s/.git/", fullPathMap[gitPushDir]),
-		}
-	if _, err :=excuteShellCommands(cmds);err!=nil{
-		pwd, _ := os.Getwd()
-		log.Log("pwd: ", pwd)
-		log.Log("pwd: ", gitMiddleDir)
-		log.Log("pwd: ", gitPushDir)
+	gitPull(cloneURL.(string))
+	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
+	targetName :=projectName+"_auto_push"
+	pushUrl := path.Dir(cloneURL.(string))+"/"+targetName +".git"
+	log.Log(pushUrl)
+	if err:=ExecMethods(gitAbsDir);err!=nil{
+		return
+	}
+	gitPull(configer["targetUrl"].(string))
+	os.Chdir(gitAbsDir)
+	path.Join(rawPWD, gitMiddleDir)
+	cmd := fmt.Sprintf("cp -R %s/* %s/", path.Join(rawPWD, gitMiddleDir), targetName)
+	if _, err :=excuteShellCommand(cmd);err!=nil{
 		panic(err)
 		return
 	}
 
-	gitPusher(pushUrl, gitPushDir)
+	gitPusher(pushUrl)
 }
 
 func cmdProtoc(targetPath string)  {
@@ -115,22 +92,23 @@ func cmdProtoc(targetPath string)  {
 }
 
 //通过cloneURL找到本地对应的仓库，并在没有此路径时git clone cloneURL， 如果冲突则删除再clone，否则直接pull
-func gitPull(cloneURL,gitPullDir  string){
+func gitPull(cloneURL string){
 	defer func(){
 		err:= os.Chdir(rawPWD)
 		if err!=nil{
 			panic(err)
 		}
 	}()
-	//projectName :=strings.Split(path.Base(cloneURL), ".git")[0]
-	//pwd, _ := os.Getwd()
-	gitsPath := path.Join(gitBaseDir, gitPullDir)
-	if err:=os.Chdir(gitsPath);err!=nil{
-		log.Log("no proto?")
-		panic(err)
-	}
+	// 缺人项目已经创建
+	CheckDirOrCreate(gitAbsDir)
+	gitPullDir :=strings.Split(path.Base(cloneURL), ".git")[0]
+	gitsPath := path.Join(gitAbsDir, gitPullDir)
 	ifExistGit, _ := PathExists(gitsPath)
 	if !ifExistGit{
+		if err:=os.Chdir(gitAbsDir);err!=nil{
+			log.Log("no proto?")
+			panic(err)
+		}
 		//如果本地不存在仓库
 		resp, _ := excuteShellCommand("git clone " + cloneURL)
 		log.Log(gitsPath)
@@ -154,9 +132,9 @@ func gitPull(cloneURL,gitPullDir  string){
 
 }
 
-func gitPusher(cloneURL,gitPushDir string){
-	pushProjectName := strings.Split(path.Base(cloneURL), ".git")[0]
-	pushPath := path.Join(rawPWD, gitBaseDir, pushProjectName)
+func gitPusher(pushUrl string){
+	pushProjectName := strings.Split(path.Base(pushUrl), ".git")[0]
+	pushPath := path.Join(rawPWD, gitAbsDir, pushProjectName)
 	fmt.Println("------->pushPath: ", pushPath)
 	os.Chdir(pushPath)
 	defer func(){
@@ -246,30 +224,6 @@ func GetStrandMapBody(r *http.Request) (string, map[string]interface{}, error){
 	return "", nil, errors.New("请求HEADER类型错误，请检查！")
 }
 
-//读取map的方法
-func GetMapContent(m map[string]interface{}, path ...string) (interface{}, error){
-	//本接口将获取一个map中，按path路径取值，返回一个interface
-	var content interface{}
-	var ok bool
-	l := len(path)
-	if l ==0 || (l == 1 && path[0]==""){  //当没有填入
-		return m, nil
-	}
-	for k, v:= range path{
-		if k ==l-1{
-			content, ok = m[v]
-			if !ok{
-				return nil, errors.New(" 配置读取错误---> 	" + v)
-			}
-			return content,nil
-		}
-		if m, ok = m[v].(map[string]interface{}); !ok{
-			return nil, errors.New(" 配置读取错误---> 	" + v)
-		}
-	}
-	return nil, errors.New("missing map!")
-}
-
 //检查一个dir路径，没有则会创建
 func CheckDirOrCreate(dirPath string) error{
 	if ifExist,err :=PathExists(dirPath); err != nil{
@@ -284,22 +238,19 @@ func CheckDirOrCreate(dirPath string) error{
 }
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
-	for _,v := range fullPathMap{
-		checkSourceDir(v)
-	}
-
 	if path.Ext(curPath) == ".proto"{
-		log.Log(fullPathMap)
-		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathMap[gitPullDir], fullPathMap[gitMiddleDir], fullPathMap[gitMiddleDir], curPath)
+		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=. --go_out=. %s", path.Dir(curPath), curPath)
 		if _, err:=excuteShellCommand(cmd);err!=nil{
-			panic(err)
+			log.Log(err)
+			return err
 		}
 	}
-	return err
+	return nil
 }
 
-func GetFilelist(path string) {
+func ExecMethods(path string) error{
 	if err := filepath.Walk(path, protoc);err!=nil{
-		fmt.Println("test")
+		return err
 	}
+	return nil
 }

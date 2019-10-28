@@ -7,5 +7,5 @@ import (
 
 func TestService(t *testing.T) {
 	log.Log()
-	GetFilelist(gitBaseDir)
+	ExecMethods(gitAbsDir)
 }
