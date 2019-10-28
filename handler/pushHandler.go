@@ -105,12 +105,16 @@ func gitPull(cloneURL string){
 	gitsPath := path.Join(gitAbsDir, gitPullDir)
 	ifExistGit, _ := PathExists(gitsPath)
 	if !ifExistGit{
+		fmt.Println("git pull clone")
 		if err:=os.Chdir(gitAbsDir);err!=nil{
 			log.Log("no proto?")
 			panic(err)
 		}
 		//如果本地不存在仓库
-		resp, _ := excuteShellCommand("git clone " + cloneURL)
+		resp, err := excuteShellCommand("git clone " + cloneURL)
+		if err != nil{
+			fmt.Println("----->err : ", err)
+		}
 		log.Log(gitsPath)
 		os.Chdir(gitsPath)
 		ifErr := strings.Index(resp, "error")
