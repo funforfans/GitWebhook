@@ -75,7 +75,10 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	}
 	//一定要加上，将工作目录切换回去
 	defer func(){
-		os.Chdir(rawPWD)
+		err:= os.Chdir(rawPWD)
+		if err!=nil{
+			panic(err)
+		}
 	}()
 	cloneURL, err := GetMapContent(body, "repository", "clone_url")
 	if err != nil{
@@ -84,8 +87,13 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string), gitPullDir)
+	//进入需要clone或者pull的目录
+	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
+	gitBaseDir:=path.Join(rawPWD, "gits", projectName)
+	GetFilelist(gitBaseDir)
 	pushUrl :="http://git.touch4.me/xuyiwen/target.git"
 	gitPull(pushUrl, gitPushDir)
+	gitPusher(pushUrl, gitPushDir)
 }
 
 func cmdProtoc(targetPath string)  {
@@ -96,18 +104,29 @@ func cmdProtoc(targetPath string)  {
 
 //通过cloneURL找到本地对应的仓库，并在没有此路径时git clone cloneURL， 如果冲突则删除再clone，否则直接pull
 func gitPull(cloneURL,gitPullDir  string){
-	projectName :=strings.Split(path.Base(cloneURL), ".git")[0]
-	pwd, _ := os.Getwd()
-	gitsPath := path.Join(pwd, gitPullDir)
-	log.Log(gitsPath)
-	err := CheckDirOrCreate(gitsPath)
-	if err!=nil{
-		panic(err)
-	}
+	defer func(){
+		err:= os.Chdir(rawPWD)
+		if err!=nil{
+			panic(err)
+		}
+	}()
+	//projectName :=strings.Split(path.Base(cloneURL), ".git")[0]
+	//pwd, _ := os.Getwd()
+	gitsPath := path.Join(gitBaseDir, gitPullDir)
+	log.Log("1: ", rawPWD)
+	log.Log("2: ",gitBaseDir)
+	log.Log("3: ",gitPullDir)
+	//下面会自动clone
+	//log.Log(gitsPath)
+	//err := CheckDirOrCreate(gitsPath)
+	//if err!=nil{
+	//	panic(err)
+	//}
 	if err:=os.Chdir(gitsPath);err!=nil{
+		log.Log("no proto?")
 		panic(err)
 	}
-	gitPrjPath := path.Join(gitsPath, projectName)
+	gitPrjPath := gitsPath//path.Join(gitsPath, projectName)
 	ifExistGit, _ := PathExists(gitPrjPath)
 	if !ifExistGit{
 		//如果本地不存在仓库
@@ -133,8 +152,24 @@ func gitPull(cloneURL,gitPullDir  string){
 
 }
 
-func gitPusher(cloneURL,gitPullDir  string){
-	
+func gitPusher(cloneURL,gitPushDir string){
+	pushProjectName := strings.Split(path.Base(cloneURL), ".git")[0]
+	pushPath := path.Join(rawPWD, gitBaseDir, pushProjectName)
+	fmt.Println("------->pushPath: ", pushPath)
+	os.Chdir(pushPath)
+	defer func(){
+		err:= os.Chdir(rawPWD)
+		if err!=nil{
+			panic(err)
+		}
+	}()
+	commands := []string{}
+	commands = append(commands, "git add .")
+	commands = append(commands, "git commit -m \"自动编译，提交\"")
+	commands = append(commands, "git push")
+	resps := excuteShellCommands(commands)
+	log.Log("----> push resps: ", resps)
+
 }
 
 func getCommands()[]string{
@@ -262,6 +297,6 @@ func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
 
 func GetFilelist(path string) {
 	if err := filepath.Walk(path, protoc);err!=nil{
-
+		fmt.Println("test")
 	}
 }
