@@ -67,8 +67,7 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string))
 	projectName :=strings.Split(path.Base(cloneURL.(string)), ".git")[0]
-	targetName :=projectName+"_auto_push"
-	if err:=CheckDirOrCreate(path.Join(gitAbsDir, gitMiddleDir, targetName));err!=nil{
+	if err:=CheckDirOrCreate(path.Join(gitAbsDir, gitMiddleDir, projectName));err!=nil{
 		log.Log(err)
 		return
 	}
@@ -78,7 +77,7 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	generateDir :=configer["targetUrl"].(string)
 	generateName :=strings.Split(path.Base(generateDir), ".git")[0]
 	gitPull(configer["targetUrl"].(string))
-	cmd := fmt.Sprintf("cp -R %s/ %s/",path.Join(gitAbsDir, gitMiddleDir, targetName), path.Join(gitAbsDir, generateName))
+	cmd := fmt.Sprintf("cp -R %s/ %s/",path.Join(gitAbsDir, gitMiddleDir, projectName), path.Join(gitAbsDir, generateName))
 	if _, err :=excuteShellCommand(cmd);err!=nil{
 		panic(err)
 		return
@@ -244,9 +243,12 @@ func CheckDirOrCreate(dirPath string) error{
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
 	log.Log("ddfdfdf", curPath)
+	//pathSp:=strings.Split(curPath, gitAbsDir)[1]
+	//outPutPath:= path.Join(gitAbsDir, gitMiddleDir, pathSp)
+	path.Dir(curPath)
 	if path.Ext(curPath) == ".proto"{
 		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s",
-			path.Dir(curPath), path.Join(gitAbsDir, gitMiddleDir), path.Join(gitAbsDir, gitMiddleDir), curPath)
+			path.Dir(curPath), path.Join(gitAbsDir, "template/proto"), path.Join(gitAbsDir, "template/proto"), curPath)
 		if _, err:=excuteShellCommand(cmd);err!=nil{
 			log.Log(err)
 			return err
