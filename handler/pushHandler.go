@@ -91,11 +91,12 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	GetFilelist(gitBaseDir)
 	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
 	gitPull(pushUrl, gitPushDir)
-	gitsPath := path.Join(rawPWD, "gits")
-	os.Chdir(gitsPath)
-	log.Log("gitsPath", gitsPath)
-	cmd := fmt.Sprintf("cp -R %s %s", gitMiddleDir, gitPushDir)
-	if _, err :=excuteShellCommand(cmd);err!=nil{
+	os.Chdir(gitBaseDir)
+	log.Log("gitsPath", gitBaseDir)
+	cmds := []string{fmt.Sprintf("cp -R %s %s", fullPathMap[gitMiddleDir], fullPathMap[gitPushDir]),
+					 fmt.Sprintf("rm -f %s/.git/", fullPathMap[gitPushDir]),
+		}
+	if _, err :=excuteShellCommands(cmds);err!=nil{
 		pwd, _ := os.Getwd()
 		log.Log("pwd: ", pwd)
 		log.Log("pwd: ", gitMiddleDir)
@@ -124,26 +125,16 @@ func gitPull(cloneURL,gitPullDir  string){
 	//projectName :=strings.Split(path.Base(cloneURL), ".git")[0]
 	//pwd, _ := os.Getwd()
 	gitsPath := path.Join(gitBaseDir, gitPullDir)
-	log.Log("1: ", rawPWD)
-	log.Log("2: ",gitBaseDir)
-	log.Log("3: ",gitPullDir)
-	//下面会自动clone
-	//log.Log(gitsPath)
-	//err := CheckDirOrCreate(gitsPath)
-	//if err!=nil{
-	//	panic(err)
-	//}
 	if err:=os.Chdir(gitsPath);err!=nil{
 		log.Log("no proto?")
 		panic(err)
 	}
-	gitPrjPath := gitsPath//path.Join(gitsPath, projectName)
-	ifExistGit, _ := PathExists(gitPrjPath)
+	ifExistGit, _ := PathExists(gitsPath)
 	if !ifExistGit{
 		//如果本地不存在仓库
 		resp, _ := excuteShellCommand("git clone " + cloneURL)
-		log.Log(gitPrjPath)
-		os.Chdir(gitPrjPath)
+		log.Log(gitsPath)
+		os.Chdir(gitsPath)
 		ifErr := strings.Index(resp, "error")
 		if ifErr != -1{
 			fmt.Println("发送错误")
@@ -151,8 +142,8 @@ func gitPull(cloneURL,gitPullDir  string){
 		fmt.Println(resp)
 	}else {
 		//如果本地已经存在仓库
-		os.Chdir(gitPrjPath)
-		log.Log(gitPrjPath)
+		os.Chdir(gitsPath)
+		log.Log(gitsPath)
 		resp, _ := excuteShellCommand("git pull ")
 		ifErr := strings.Index(resp, "error")
 		if ifErr != -1{
@@ -299,8 +290,10 @@ func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
 
 	if path.Ext(curPath) == ".proto"{
 		log.Log(fullPathMap)
-		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathMap["proto"], fullPathMap["template"], fullPathMap["template"], curPath)
-		excuteShellCommand(cmd)
+		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s", fullPathMap[gitPullDir], fullPathMap[gitMiddleDir], fullPathMap[gitMiddleDir], curPath)
+		if _, err:=excuteShellCommand(cmd);err!=nil{
+			panic(err)
+		}
 	}
 	return err
 }
