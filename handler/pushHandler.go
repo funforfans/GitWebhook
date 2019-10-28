@@ -23,7 +23,7 @@ var(
 	gitPullDir = "proto"
 	gitMiddleDir = "template"
 	gitPushDir = "target"
-	fullPathDir = []string{}
+	fullPathMap = make(map[string] string, 3)
 )
 
 func init()  {
@@ -32,11 +32,10 @@ func init()  {
 	gitBaseDir=path.Join(rawPWD, gitBaseDir)
 	dirList := []string{gitPullDir, gitMiddleDir, gitPushDir}
 	for i, dir:=range dirList{
-		if dir != ""{
-			dirList[i] = path.Join(gitBaseDir, dir)
-		}
+		fullPathMap[dir] = path.Join(gitBaseDir, dir)
+		dirList[i] = fullPathMap[dir]
 	}
-	fullPathDir = dirList
+	fullPathDir := dirList
 	checkSourceDir(fullPathDir...)
 }
 func checkSourceDir(fullPathDir ...string)  {
@@ -84,8 +83,18 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(curPath, cloneURL)
 	//拉取代码开始进行操作
 	gitPull(cloneURL.(string), gitPullDir)
-	pushUrl :="http://git.touch4.me/xuyiwen/target.git"
+	curPath,_ :=os.Getwd()
+	gitBaseDir:=path.Join(curPath, "gits")
+	GetFilelist(gitBaseDir)
+	pushUrl :="http://git.touch4.me/xuyiwen/generate_protocol.git"
 	gitPull(pushUrl, gitPushDir)
+	cmd := fmt.Sprintf("cp -R %s %s", gitMiddleDir, gitPushDir)
+	if _, err :=excuteShellCommand(cmd);err!=nil{
+		panic(err)
+		return
+	}
+
+	gitPusher(pushUrl, gitPushDir)
 }
 
 func cmdProtoc(targetPath string)  {
@@ -111,7 +120,7 @@ func gitPull(cloneURL,gitPullDir  string){
 	ifExistGit, _ := PathExists(gitPrjPath)
 	if !ifExistGit{
 		//如果本地不存在仓库
-		resp := excuteShellCommand("git clone " + cloneURL)
+		resp, _ := excuteShellCommand("git clone " + cloneURL)
 		log.Log(gitPrjPath)
 		os.Chdir(gitPrjPath)
 		ifErr := strings.Index(resp, "error")
@@ -123,7 +132,7 @@ func gitPull(cloneURL,gitPullDir  string){
 		//如果本地已经存在仓库
 		os.Chdir(gitPrjPath)
 		log.Log(gitPrjPath)
-		resp := excuteShellCommand("git pull ")
+		resp, _ := excuteShellCommand("git pull ")
 		ifErr := strings.Index(resp, "error")
 		if ifErr != -1{
 			fmt.Println("发送错误")
@@ -134,38 +143,34 @@ func gitPull(cloneURL,gitPullDir  string){
 }
 
 func gitPusher(cloneURL,gitPullDir  string){
-	
+
 }
 
-func getCommands()[]string{
-	var commands = make([]string, 2)
-	commands = append(commands, "-c")
-	commands = append(commands, "tree -L 1")
-	//commands = append(commands, "rm test")
-	return commands
-}
-
-func excuteShellCommands(commands []string)[]string{
+func excuteShellCommands(commands []string)([]string, error){
 	var resps = make([]string, 1)
 	for _, i := range commands{
 		if i != ""{
-			resp := excuteShellCommand(i)
+			resp , err := excuteShellCommand(i)
+			if err!=nil{
+				return nil , err
+			}
 			resps = append(resps, resp)
 		}
 	}
-	return resps
+	return resps, nil
 }
 
-func excuteShellCommand(command string)string{
+func excuteShellCommand(command string) (string, error){
 	fmt.Println("command: ", command)
 	cmd := exec.Command("/bin/bash", "-c", command)
 	bytes,err := cmd.Output()
 	if err != nil {
 		log.Log(err)
+		return "", err
 		}
 	resp := string(bytes)
 	log.Log("\n", resp)
-	return resp
+	return resp, nil
 }
 
 func ComputeHmacSha256(message string, secret string) string {
