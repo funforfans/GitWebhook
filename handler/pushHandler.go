@@ -23,7 +23,7 @@ var(
 	configPath = "config/config.json"
 )
 
-func init()  {
+func Init()  {
 	log.Log("init...", rawPWD)
 	ConfigWatcher(path.Join(rawPWD, configPath))
 }
@@ -93,6 +93,7 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	cancelCmd:=fmt.Sprintf("rm -rf %s", projectPath)
 	if res, err:=excuteShellCommand(cancelCmd); err!=nil{
 		log.Log(res, err)
+		return
 	}
 }
 
@@ -194,23 +195,6 @@ func ComputeHmacSha256(message string, secret string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func GetStrBody(r *http.Request) (string, error) {
-	ContType  := r.Header["Content-Type"]
-	var strb string
-	if ContType[0] == "application/json"{
-		if err:=r.ParseForm();err!=nil{
-			return "", errors.New("参数解析异常")
-		}
-		b, err := ioutil.ReadAll(r.Body)
-		//fmt.Println("b: ",(string)(b))
-		if err != nil {
-			return "", errors.New("连接错误")
-		}
-		strb = string(b)
-	}
-	return strb, nil
-}
-
 //返回请求r 的string, map[string]interface{} 两种类型的body
 func GetStrandMapBody(r *http.Request) (string, map[string]interface{}, error){
 	//将参数解析为 map[string]interface{}型
@@ -247,10 +231,13 @@ func CheckDirOrCreate(dirPath string) error{
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
 	path.Dir(curPath)
-	strings.Split(curPath, gitAbsDir)
+	tmpDir:=strings.Split(curPath, gitAbsDir)[1]
+	outPutDir :=path.Join(gitAbsDir, gitMiddleDir, tmpDir)
 	if path.Ext(curPath) == ".proto"{
+		log.Log(outPutDir)
+		CheckDirOrCreate(path.Dir(outPutDir))
 		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s",
-			path.Dir(curPath), path.Join(gitAbsDir, "template/proto"), path.Join(gitAbsDir, "template/proto"), curPath)
+			path.Dir(curPath), path.Dir(outPutDir), path.Dir(outPutDir), curPath)
 		if _, err:=excuteShellCommand(cmd);err!=nil{
 			log.Log(err)
 			return err

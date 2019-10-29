@@ -4,6 +4,7 @@ import (
 	"GitWebhook/handler"
 	"github.com/micro/go-micro/util/log"
 	"github.com/micro/go-micro/web"
+	"github.com/micro/cli"
 )
 
 func main() {
@@ -13,7 +14,13 @@ func main() {
 		web.Address(":8010"),
 		)
 	log.Log("web.NewService")
-	if err := service.Init(); err != nil {
+	if err := service.Init(
+		web.Action(
+			func(c *cli.Context) {
+				// 初始化handler
+				handler.Init()
+			}),
+			); err != nil {
 		log.Fatal(err)
 	}
 	log.Log("service.Init()")
