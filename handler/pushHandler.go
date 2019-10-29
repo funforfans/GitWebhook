@@ -77,18 +77,23 @@ func GetPush(w http.ResponseWriter, r *http.Request) {
 	generateDir :=configer["targetUrl"].(string)
 	generateName :=strings.Split(path.Base(generateDir), ".git")[0]
 	gitPull(configer["targetUrl"].(string))
-	cmd := fmt.Sprintf("cp -R %s %s/",path.Join(gitAbsDir, gitMiddleDir, projectName), path.Join(gitAbsDir, generateName))
-	if _, err :=excuteShellCommand(cmd);err!=nil{
-		panic(err)
+	commands := []string{}
+	commands = append(commands, fmt.Sprintf("rm -r %s", path.Join(gitAbsDir, generateName, projectName)))
+	commands = append(commands, fmt.Sprintf("cp -R %s %s/",path.Join(gitAbsDir, gitMiddleDir, projectName), path.Join(gitAbsDir, generateName)))
+	if resp, err :=excuteShellCommands(commands);err!=nil{
+		log.Log(resp, err)
 		return
 	}
-	//gitPusher(configer["targetUrl"].(string))
-}
-
-func cmdProtoc(targetPath string)  {
-	var commands = make([]string, 2)
-	commands = append(commands, "protoc")
-	commands = append(commands, "protoc")
+	gitPusher(configer["targetUrl"].(string))
+	projectPath:=path.Join(gitAbsDir, gitMiddleDir, projectName)
+	if ifExists, err :=PathExists(projectPath); ifExists==false&&err!=nil{
+		log.Log(err)
+		return
+	}
+	cancelCmd:=fmt.Sprintf("rm -rf %s", projectPath)
+	if res, err:=excuteShellCommand(cancelCmd); err!=nil{
+		log.Log(res, err)
+	}
 }
 
 //通过cloneURL找到本地对应的仓库，并在没有此路径时git clone cloneURL， 如果冲突则删除再clone，否则直接pull
@@ -138,7 +143,7 @@ func gitPull(cloneURL string){
 
 func gitPusher(pushUrl string){
 	pushProjectName := strings.Split(path.Base(pushUrl), ".git")[0]
-	pushPath := path.Join(rawPWD, gitAbsDir, pushProjectName)
+	pushPath := path.Join(gitAbsDir, pushProjectName)
 	fmt.Println("------->pushPath: ", pushPath)
 	os.Chdir(pushPath)
 	defer func(){
@@ -147,14 +152,13 @@ func gitPusher(pushUrl string){
 			panic(err)
 		}
 	}()
+	gitPush:=fmt.Sprintf("git push %s master" , pushUrl)
 	commands := []string{}
 	commands = append(commands, "git add .")
 	commands = append(commands, "git commit -m \"自动编译，提交\"")
-	commands = append(commands, "git push")
+	commands = append(commands, gitPush)
 	resps, _ := excuteShellCommands(commands)
 	log.Log("----> push resps: ", resps)
-
-
 }
 
 func excuteShellCommands(commands []string)([]string, error){
@@ -242,10 +246,8 @@ func CheckDirOrCreate(dirPath string) error{
 }
 
 func protoc(curPath string, fileInfo os.FileInfo, err error)  error{
-	log.Log("ddfdfdf", curPath)
-	//pathSp:=strings.Split(curPath, gitAbsDir)[1]
-	//outPutPath:= path.Join(gitAbsDir, gitMiddleDir, pathSp)
 	path.Dir(curPath)
+	strings.Split(curPath, gitAbsDir)
 	if path.Ext(curPath) == ".proto"{
 		cmd := fmt.Sprintf("protoc --proto_path=%s --micro_out=%s --go_out=%s %s",
 			path.Dir(curPath), path.Join(gitAbsDir, "template/proto"), path.Join(gitAbsDir, "template/proto"), curPath)
